@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "pet": {
+    "name": "Byte",
+    "mood": 83.20468327537245,
+    "hunger": 70.67390432596238,
+    "energy": 91.33695216298064,
+    "xp": 20,
+    "level": 1,
+    "stage": "egg",
+    "total_scans": 0,
+    "total_pings": 2,
+    "total_hosts_found": 0,
+    "tool_affinity": {
+      "ping": 2
+    },
+    "last_update": 1773842576.0410075,
+    "last_fed": 1773839778.2123063
+  }
+}
