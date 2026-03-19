@@ -32,7 +32,7 @@ Built with Python and pygame. Every module is annotated with **LEARNING NOTES** 
 ### 1. Clone
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/netgotchi.git
+git clone https://github.com/d3ej/netgotchi.git
 cd netgotchi
 ```
 
