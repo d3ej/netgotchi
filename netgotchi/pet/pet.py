@@ -35,10 +35,10 @@ STAGES = [STAGE_EGG, STAGE_HATCHLING, STAGE_JUVENILE, STAGE_ADULT, STAGE_ELDER]
 # XP thresholds to evolve to each stage
 EVOLUTION_XP = {
     STAGE_EGG: 0,
-    STAGE_HATCHLING: 50,
-    STAGE_JUVENILE: 200,
-    STAGE_ADULT: 500,
-    STAGE_ELDER: 1000,
+    STAGE_HATCHLING: 100,
+    STAGE_JUVENILE: 300,
+    STAGE_ADULT: 900,
+    STAGE_ELDER: 4500,
 }
 
 # Pet name at each stage — your pet earns a new name as it grows!
@@ -155,12 +155,12 @@ class Pet:
         elapsed = now - self._last_update
         self._last_update = now
 
-        # Hunger decays ~1 point per 5 minutes
-        hunger_decay = elapsed / 300.0
+        # Hunger decays ~1 point per hour
+        hunger_decay = elapsed / 3600.0
         self.hunger = _clamp(self.hunger - hunger_decay)
 
-        # Energy decays ~1 point per 10 minutes
-        energy_decay = elapsed / 600.0
+        # Energy decays ~1 point per hour
+        energy_decay = elapsed / 3600.0
         self.energy = _clamp(self.energy - energy_decay)
 
         # Mood is influenced by hunger and energy
