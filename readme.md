@@ -74,13 +74,13 @@ brew install nmap
 
 ## Controls
 
-| Button | Keys | Action |
-|--------|------|--------|
-| **D-Pad** | Arrow keys / WASD | Navigate menus |
-| **A** | Enter / Z | Confirm / select |
-| **B** | Escape / X | Cancel / back |
-| **START** | Space | Open menu |
-| **SELECT** | Tab | Secondary action |
+| Key(s) | Action |
+|--------|--------|
+| Arrow keys / WASD | Navigate menus |
+| Enter / Z | Confirm / select |
+| Escape / X | Cancel / back |
+| Space | Open menu |
+| Tab | Secondary action |
 
 In the SSH CLI mode, type freely with your keyboard. **Enter** submits the command, **Escape** returns to the command list.
 

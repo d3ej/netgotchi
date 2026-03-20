@@ -174,7 +174,7 @@ class DialogBox:
             self._finished = True
 
     def skip(self):
-        """Instantly show all text (when player presses A)."""
+        """Instantly show all text (when player presses Enter)."""
         self._visible_chars = len(self._full_text)
         self._finished = True
 
@@ -241,7 +241,7 @@ class Menu:
         1. Show a list of options in a box
         2. A cursor (▸) highlights the current selection
         3. Up/Down moves the cursor
-        4. A confirms, B cancels
+        4. Enter confirms, Escape cancels
 
         The cursor index is just an integer that wraps around:
         pressing Down at the bottom goes back to top.

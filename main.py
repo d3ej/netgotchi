@@ -105,7 +105,7 @@ class OverworldScene(Scene):
         # Update dialog typewriter
         self.dialog.update(dt)
 
-        # A button skips dialog text
+        # Enter skips dialog text
         if input_state.pressed(A) and not self.dialog.finished:
             self.dialog.skip()
 
@@ -195,7 +195,7 @@ class MainMenuScene(Scene):
     def update(self, input_state, dt):
         result = self.menu.update(input_state)
 
-        # B button closes menu
+        # Escape closes menu
         if self.menu.cancelled:
             self.game.scene_manager.pop()
             return
@@ -408,7 +408,7 @@ class PingScene(Scene):
             err = str(self.result.error)[:25]
             font.draw(surface, err, 4, y, RED)
 
-        font.draw(surface, "Press A/B to continue", 20, 92, GRAY)
+        font.draw(surface, "Press Enter/Esc to continue", 20, 92, GRAY)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -687,7 +687,7 @@ class SSHScene(Scene):
                 err_msg = str(self.result.error)[:25]
             font.draw(surface, err_msg, 4, y, RED)
 
-        font.draw(surface, "Press A/B to continue", 20, 100, GRAY)
+        font.draw(surface, "Press Enter/Esc to continue", 20, 100, GRAY)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -735,7 +735,7 @@ class PetStatusScene(Scene):
             font.draw(surface, text, 8, y, color)
             y += 10
 
-        font.draw(surface, "Press A/B to go back", 20, 130, GRAY)
+        font.draw(surface, "Press Enter/Esc to go back", 20, 130, GRAY)
 
 
 # ═══════════════════════════════════════════════════════════════════════
