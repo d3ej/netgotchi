@@ -31,6 +31,8 @@ SSH AUTHENTICATION:
 """
 
 import os
+import threading
+import time
 
 from .base import BaseTool
 
@@ -98,6 +100,11 @@ class SSHTool(BaseTool):
         username = params.get("username", os.getenv("USER", "admin"))
         command = params.get("command", "whoami")
         key_path = params.get("key_path")
+        pkey_path = params.get("pkey_path") or key_path
+        password = params.get("password")
+        allow_agent = params.get("allow_agent", True)
+        look_for_keys = params.get("look_for_keys", True)
+        keyboard_interactive = params.get("keyboard_interactive", False)
 
         # LEARNING NOTE — paramiko.SSHClient():
         #   This is the main class you'll use. It wraps the entire
@@ -112,21 +119,35 @@ class SSHTool(BaseTool):
             #   hostname: IP or DNS name
             #   port: default 22
             #   username: login account
+            #   password: SSH password (for password/kbi auth)
             #   key_filename: path to your private key file
             #   timeout: seconds to wait for connection
             #   allow_agent: try SSH agent for keys
             #   look_for_keys: auto-find keys in ~/.ssh/
+            #   auth_timeout: timeout for authentication
             connect_kwargs = {
                 "hostname": host,
                 "port": port,
                 "username": username,
                 "timeout": 10,
-                "allow_agent": True,
-                "look_for_keys": True,
+                "auth_timeout": 10,
+                "banner_timeout": 10,
+                "allow_agent": allow_agent,
+                "look_for_keys": look_for_keys,
             }
 
-            if key_path:
-                connect_kwargs["key_filename"] = key_path
+            if keyboard_interactive:
+                # Prefer keyboard-interactive with password provided
+                connect_kwargs["allow_agent"] = False
+                connect_kwargs["look_for_keys"] = False
+                if password:
+                    connect_kwargs["password"] = password
+
+            elif password:
+                connect_kwargs["password"] = password
+
+            if pkey_path:
+                connect_kwargs["key_filename"] = pkey_path
 
             client.connect(**connect_kwargs)
 
@@ -179,6 +200,128 @@ class SSHTool(BaseTool):
             #   This ensures we close the connection and don't leak resources.
             #   This is similar to how you free SDL resources in your C project.
             client.close()
+
+    def open_shell(self, params, on_output, on_close=None):
+        """Open an interactive SSH shell and stream output through callbacks."""
+        if not HAS_PARAMIKO:
+            on_output("paramiko not installed! Run: pip install paramiko\n")
+            if on_close:
+                on_close(False, "paramiko missing")
+            return None
+
+        host = params.get("host", "127.0.0.1")
+        port = params.get("port", 22)
+        username = params.get("username", os.getenv("USER", "admin"))
+        key_path = params.get("key_path")
+        pkey_path = params.get("pkey_path") or key_path
+        password = params.get("password")
+        allow_agent = params.get("allow_agent", True)
+        look_for_keys = params.get("look_for_keys", True)
+        keyboard_interactive = params.get("keyboard_interactive", False)
+
+        stop_event = threading.Event()
+
+        session = {
+            "client": None,
+            "channel": None,
+            "stop_event": stop_event,
+        }
+
+        def worker():
+            client = paramiko.SSHClient()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            session["client"] = client
+
+            try:
+                connect_kwargs = {
+                    "hostname": host,
+                    "port": port,
+                    "username": username,
+                    "timeout": 10,
+                    "auth_timeout": 10,
+                    "banner_timeout": 10,
+                    "allow_agent": allow_agent,
+                    "look_for_keys": look_for_keys,
+                }
+
+                if keyboard_interactive:
+                    connect_kwargs["allow_agent"] = False
+                    connect_kwargs["look_for_keys"] = False
+                    if password:
+                        connect_kwargs["password"] = password
+                elif password:
+                    connect_kwargs["password"] = password
+
+                if pkey_path:
+                    connect_kwargs["key_filename"] = pkey_path
+
+                client.connect(**connect_kwargs)
+
+                channel = client.invoke_shell(term="xterm", width=80, height=24)
+                channel.settimeout(0.1)
+                session["channel"] = channel
+
+                on_output(f"*** Connected to {host} as {username} ***\n")
+
+                while not stop_event.is_set() and channel.active and not channel.closed:
+                    if channel.recv_ready():
+                        chunk = channel.recv(1024).decode("utf-8", errors="replace")
+                        on_output(chunk)
+                    else:
+                        time.sleep(0.05)
+
+                on_output("*** SSH session closed ***\n")
+                if on_close:
+                    on_close(True, None)
+
+            except Exception as e:
+                on_output(f"SSH error: {e}\n")
+                if on_close:
+                    on_close(False, str(e))
+
+            finally:
+                if session.get("channel") is not None:
+                    try:
+                        session["channel"].close()
+                    except Exception:
+                        pass
+                if session.get("client") is not None:
+                    try:
+                        session["client"].close()
+                    except Exception:
+                        pass
+
+        threading.Thread(target=worker, daemon=True).start()
+
+        def send_command(line):
+            ch = session.get("channel")
+            if ch and ch.active and not ch.closed:
+                try:
+                    ch.send(line)
+                    return True
+                except Exception:
+                    return False
+            return False
+
+        def close_session():
+            stop_event.set()
+            ch = session.get("channel")
+            if ch is not None:
+                try:
+                    ch.close()
+                except Exception:
+                    pass
+            cli = session.get("client")
+            if cli is not None:
+                try:
+                    cli.close()
+                except Exception:
+                    pass
+
+        session["send"] = send_command
+        session["close"] = close_session
+
+        return session
 
     def xp_reward(self, result_data):
         if result_data.get("connected"):

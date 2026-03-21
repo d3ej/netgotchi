@@ -79,15 +79,9 @@ class ScannerTool(BaseTool):
         Returns:
             Dict with discovered hosts and services.
         """
-        if not HAS_NMAP:
-            return {
-                "hosts": [],
-                "host_count": 0,
-                "error": "python-nmap not installed! Run: pip install python-nmap",
-            }
 
-        target = params.get("target", "127.0.0.1")
-        scan_type = params.get("scan_type", "quick")
+        target = params.get("target", "")
+        scan_type = params.get("scan_type", "full")
         ports = params.get("ports", "22,80,443")
 
         nm = nmap.PortScanner()

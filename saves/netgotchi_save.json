@@ -2,19 +2,20 @@
   "version": 1,
   "pet": {
     "name": "Byte",
-    "mood": 92.51624283576393,
-    "hunger": 79.99327598876444,
-    "energy": 97.99327598876444,
-    "xp": 10,
-    "level": 1,
-    "stage": "egg",
-    "total_scans": 0,
-    "total_pings": 1,
-    "total_hosts_found": 0,
+    "mood": 42.02787375017,
+    "hunger": 45.44854651338547,
+    "energy": 26.448546513385477,
+    "xp": 135,
+    "level": 2,
+    "stage": "hatchling",
+    "total_scans": 5,
+    "total_pings": 4,
+    "total_hosts_found": 3,
     "tool_affinity": {
-      "ping": 1
+      "ping": 4,
+      "nmap": 8
     },
-    "last_update": 1773884295.222288,
+    "last_update": 1774062656.2483993,
     "last_fed": 1773884271.0158482
   }
 }

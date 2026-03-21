@@ -1,8 +1,6 @@
 # NetGotchi
 
-A network engineering toolkit disguised as a virtual pet game. Run real network tools — ping, SSH, nmap — and watch your pet evolve as you investigate!
-
-Built with Python and pygame. Every module is annotated with **LEARNING NOTES** that teach Python, networking, and game development concepts as you read the code.
+A **pwnagotchi-inspired** network utility toolbox with a retro Game Boy Color aesthetic. Run real networking tools (ping, SSH, nmap) from a pixel interface and watch your virtual pet evolve as you improve your tooling.
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![pygame](https://img.shields.io/badge/pygame-2.5%2B-green)
@@ -22,10 +20,12 @@ Built with Python and pygame. Every module is annotated with **LEARNING NOTES** 
 
 - **GBC-authentic display** — 160×144 internal resolution, 4× integer-scaled to 640×576. 4-color palettes, 8×8 pixel sprites, JRPG-style dialog boxes and menus
 - **Virtual pet** — Bit hatches from an egg and evolves through 5 stages (Bit → Byte → Packet → Frame → Stream) as you earn XP
-- **Real network tools** — Ping hosts, SSH into devices with preset or freeform CLI commands, scan networks with nmap
+- **Real network tools** — Ping hosts, SSH into devices with multi-method authentication and real-time shell streaming, scan networks with nmap
 - **Dynamic host discovery** — Reads `~/.ssh/config` and `/etc/hosts` so your real hosts appear in-game
+- **Advanced SSH authentication** — Password, public key, and keyboard-interactive auth modes with interactive UI featuring masked password input
+- **Real-time shell streaming** — Connect to remote SSH servers, execute commands, and see output stream in real-time within the GBC interface
+- **Custom target input** — Enter any host/IP manually across all tools without pre-configuration
 - **Save system** — Pet stats persist to JSON between sessions; your pet gets hungry while you're away
-- **Educational codebase** — Every file includes inline teaching comments covering Python patterns, networking fundamentals, and game architecture
 
 ## Quickstart
 
@@ -82,7 +82,34 @@ brew install nmap
 | Space | Open menu |
 | Tab | Secondary action |
 
-In the SSH CLI mode, type freely with your keyboard. **Enter** submits the command, **Escape** returns to the command list.
+In the SSH tool, you can:
+- Select from discovered hosts (`~/.ssh/config`, `/etc/hosts`) or enter a custom hostname/IP
+- Choose your authentication method: **password**, **public key** (`~/.ssh/id_rsa`), or **keyboard-interactive** challenge
+- See real-time command output streamed into the GBC display as if it were a retro terminal
+- Passwords are securely masked (displayed as asterisks) during input
+- All output appears line-by-line in the shell view with scrolling support
+
+---
+
+## SSH Authentication Guide
+
+NetGotchi supports three SSH authentication methods via an interactive authentication UI:
+
+1. **Password Authentication** — Enter your login password (displayed as `*` for security)
+2. **Public Key Authentication** — Uses `~/.ssh/id_rsa` or specify a custom key path
+3. **Keyboard-Interactive** — For servers with challenge-response auth (e.g., two-factor auth)
+
+### SSH Workflow
+
+1. Select **SSH Tool** from Tools Menu
+2. Choose a host from discovered list or **CUSTOM** to enter hostname/IP
+3. Fill in authentication fields (auto-populated with defaults where available):
+   - Username (from system `$USER` or SSH config)
+   - Password (optional, masked input)
+   - Key path (defaults to `~/.ssh/id_rsa`)
+4. Press **Enter** to move through fields, or **ESC** to cancel
+5. Shell session opens with real-time output streaming
+6. Type commands, press **Enter** to execute, **ESC** to close
 
 ---
 
@@ -107,7 +134,7 @@ netgotchi/
 │   ├── tools/
 │   │   ├── base.py             # Threaded base tool class
 │   │   ├── ping.py             # ICMP ping via subprocess
-│   │   ├── ssh.py              # SSH via paramiko
+│   │   ├── ssh.py              # SSH via paramiko (multi-auth, streaming shell)
 │   │   ├── scanner.py          # Network scanning via python-nmap
 │   │   └── hosts.py            # Host discovery from system config
 │   ├── rpg/                    # RPG mechanics (planned)
@@ -139,14 +166,14 @@ Each tool follows a 3-step pattern:
 2. **Scene** — Add a scene class in `main.py` with host/command/result phases
 3. **Wire it up** — Add the scene to `ToolMenuScene.TOOLS` and import it
 
-See `ping.py` → `PingScene` for the simplest example, or `ssh.py` → `SSHScene` for one with CLI text input.
+See `ping.py` → `PingScene` for the simplest example, or `ssh.py` → `SSHScene` for one with multi-method authentication and interactive shell streaming.
 
 ## Dependencies
 
 | Package | Purpose |
 |---------|---------|
 | `pygame` | Display, input, audio |
-| `paramiko` | SSH connections |
+| `paramiko` | SSH connections with multi-auth support |
 | `python-nmap` | Network scanning |
 | `scapy` | Low-level packet crafting (planned) |
 | `psutil` | System/network info (planned) |
