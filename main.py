@@ -585,7 +585,7 @@ class PingScene(Scene):
                 pet = self.game.pet
                 if self.result.success:
                     pet.earn_xp(self.result.xp_reward, "ping")
-                    rtt = self.result.data.get("avg_rtt_ms")
+                    rtt = self.result.data.get("rtt_avg")
                     pet.react_to_ping(True, rtt)
                 else:
                     pet.react_to_ping(False)
@@ -848,6 +848,7 @@ class SSHScene(Scene):
         self.shell_output_lines = []
         self.shell_buffer = ""
         self.shell_scroll = 0
+        pygame.key.set_repeat(400, 50)
         self.dialog.set_text(f"Connecting to {self.selected_host['name']}...")
 
         params = {
@@ -893,11 +894,13 @@ class SSHScene(Scene):
         self.dialog.set_text(f"SSH {h['name']}...")
         params = {
             "host": h["host"],
-            "port": h["port"],
+            "port": h.get("port", 22),
             "command": command,
+            "username": (self.auth_data or {}).get("username") or h.get("user"),
+            "password": (self.auth_data or {}).get("password"),
+            "pkey_path": (self.auth_data or {}).get("pkey_path"),
+            "keyboard_interactive": (self.auth_data or {}).get("keyboard_interactive", False),
         }
-        if h.get("user"):
-            params["username"] = h["user"]
         self.ssh_tool.run(params, callback=self._on_ssh_done)
 
     def _submit_cli_command(self):
@@ -987,6 +990,32 @@ class SSHScene(Scene):
                     return
 
             # Blink cursor timer
+            self._cursor_timer += dt
+            if self._cursor_timer >= 0.5:
+                self._cursor_timer -= 0.5
+                self._cursor_visible = not self._cursor_visible
+            return
+
+        # ── CLI typing phase ────────────────────────────────────────
+        if self.phase == "cli":
+            for char in input_state.text_events:
+                if len(self._cli_buffer) < 80:
+                    self._cli_buffer += char
+
+            for event in input_state.key_events:
+                if event.key == pygame.K_BACKSPACE:
+                    self._cli_buffer = self._cli_buffer[:-1]
+                elif event.key == pygame.K_RETURN:
+                    if self._cli_buffer.strip():
+                        self._submit_cli_command()
+                    return
+                elif event.key == pygame.K_ESCAPE:
+                    pygame.key.set_repeat(0)
+                    self.phase = "command"
+                    self._cli_buffer = ""
+                    self.dialog.set_text("Select command:")
+                    return
+
             self._cursor_timer += dt
             if self._cursor_timer >= 0.5:
                 self._cursor_timer -= 0.5
@@ -1115,6 +1144,8 @@ class SSHScene(Scene):
             font.draw(surface, err_msg, 4, y, RED)
 
         font.draw(surface, "Press Enter/Esc to continue", 20, 100, GRAY)
+
+
 class ScannerScene(Scene):
     """Nmap scanning scene with target selection and results."""
 
@@ -1137,6 +1168,7 @@ class ScannerScene(Scene):
         self.dot_timer = 0.0
         self.dot_count = 0
 
+        self.scanner_scroll = 0
         self.dialog = DialogBox(game.font, x=4, y=104, width=152, height=36)
         self.dialog.set_text("Select target to scan:")
 
@@ -1144,11 +1176,9 @@ class ScannerScene(Scene):
         self.result = result
         self.waiting = False
 
-        if result.success:
+        if result.success and isinstance(result.data, dict):
             pet = self.game.pet
-            pet.earn_xp(result.xp_reward, "nmap")
-            if isinstance(result.data, dict):
-                pet.react_to_scan(result.data.get("host_count", 0))
+            pet.react_to_scan(result.data.get("host_count", 0))
 
         self.phase = "result"
 
@@ -1185,9 +1215,9 @@ class ScannerScene(Scene):
 
         if self.phase == "result" and self.result is not None:
             if input_state.pressed(UP):
-                self.scanner_scroll = max(0, getattr(self, "scanner_scroll", 0) - 1)
+                self.scanner_scroll = max(0, self.scanner_scroll - 1)
             elif input_state.pressed(DOWN):
-                self.scanner_scroll = getattr(self, "scanner_scroll", 0) + 1
+                self.scanner_scroll += 1
             elif input_state.pressed(A) or input_state.pressed(B):
                 self.game.scene_manager.pop()
             return
@@ -1261,20 +1291,15 @@ class ScannerScene(Scene):
                     font.draw(surface, f"CMD: {command[:28]}", 4, y, GRAY)
                     y += 10
 
-                for host in data.get("hosts", [])[:5 + getattr(self, "scanner_scroll", 0)]:
+                for host in data.get("hosts", [])[:5 + self.scanner_scroll]:
                     line = f"{host['ip']} {host['state']}"
                     font.draw(surface, line[:28], 4, y, WHITE)
                     y += 10
                     if y > 88:
                         break
 
-                raw_output = data.get("raw_output", "") or ""
-                if raw_output:
-                    font.draw(surface, "RAW OUTPUT:", 4, y, GRAY)
-                    y += 10
-                    for line in raw_output.splitlines()[:2]:
-                        font.draw(surface, line[:28], 4, y, WHITE)
-                        y += 8
+                font.draw(surface, f"+{self.result.xp_reward} XP", 4, y, CYAN)
+                y += 10
 
                 font.draw(surface, "Use UP/DOWN to scroll", 20, 108, GRAY)
             else:
