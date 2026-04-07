@@ -102,9 +102,13 @@ class SSHTool(BaseTool):
         key_path = params.get("key_path")
         pkey_path = params.get("pkey_path") or key_path
         password = params.get("password")
-        allow_agent = params.get("allow_agent", True)
-        look_for_keys = params.get("look_for_keys", True)
-        keyboard_interactive = params.get("keyboard_interactive", False)
+        auth_method = params.get("auth_method", "agent")
+
+        # Expand ~ to the real home directory — paramiko does NOT do this
+        if pkey_path:
+            pkey_path = os.path.expanduser(pkey_path)
+            if not os.path.isfile(pkey_path):
+                pkey_path = None  # Key doesn't exist; skip rather than error
 
         # LEARNING NOTE — paramiko.SSHClient():
         #   This is the main class you'll use. It wraps the entire
@@ -119,12 +123,17 @@ class SSHTool(BaseTool):
             #   hostname: IP or DNS name
             #   port: default 22
             #   username: login account
-            #   password: SSH password (for password/kbi auth)
+            #   password: SSH password
             #   key_filename: path to your private key file
-            #   timeout: seconds to wait for connection
             #   allow_agent: try SSH agent for keys
             #   look_for_keys: auto-find keys in ~/.ssh/
-            #   auth_timeout: timeout for authentication
+            #   timeout / auth_timeout / banner_timeout: connection timeouts
+            #
+            # LEARNING NOTE — auth_method dispatch:
+            #   We configure exactly ONE auth method rather than enabling
+            #   all of them and letting paramiko pick. This makes failures
+            #   easy to diagnose: if password auth fails, you know it tried
+            #   a password — not a key, not the agent.
             connect_kwargs = {
                 "hostname": host,
                 "port": port,
@@ -132,22 +141,19 @@ class SSHTool(BaseTool):
                 "timeout": 10,
                 "auth_timeout": 10,
                 "banner_timeout": 10,
-                "allow_agent": allow_agent,
-                "look_for_keys": look_for_keys,
+                "allow_agent": False,
+                "look_for_keys": False,
             }
 
-            if keyboard_interactive:
-                # Prefer keyboard-interactive with password provided
-                connect_kwargs["allow_agent"] = False
-                connect_kwargs["look_for_keys"] = False
+            if auth_method == "password":
                 if password:
                     connect_kwargs["password"] = password
-
-            elif password:
-                connect_kwargs["password"] = password
-
-            if pkey_path:
-                connect_kwargs["key_filename"] = pkey_path
+            elif auth_method == "key":
+                if pkey_path:
+                    connect_kwargs["key_filename"] = pkey_path
+            else:  # "agent" — use SSH agent and/or auto-discover keys in ~/.ssh/
+                connect_kwargs["allow_agent"] = True
+                connect_kwargs["look_for_keys"] = True
 
             client.connect(**connect_kwargs)
 
@@ -215,9 +221,13 @@ class SSHTool(BaseTool):
         key_path = params.get("key_path")
         pkey_path = params.get("pkey_path") or key_path
         password = params.get("password")
-        allow_agent = params.get("allow_agent", True)
-        look_for_keys = params.get("look_for_keys", True)
-        keyboard_interactive = params.get("keyboard_interactive", False)
+        auth_method = params.get("auth_method", "agent")
+
+        # Expand ~ to the real home directory — paramiko does NOT do this
+        if pkey_path:
+            pkey_path = os.path.expanduser(pkey_path)
+            if not os.path.isfile(pkey_path):
+                pkey_path = None  # Key doesn't exist; skip rather than error
 
         stop_event = threading.Event()
 
@@ -240,20 +250,19 @@ class SSHTool(BaseTool):
                     "timeout": 10,
                     "auth_timeout": 10,
                     "banner_timeout": 10,
-                    "allow_agent": allow_agent,
-                    "look_for_keys": look_for_keys,
+                    "allow_agent": False,
+                    "look_for_keys": False,
                 }
 
-                if keyboard_interactive:
-                    connect_kwargs["allow_agent"] = False
-                    connect_kwargs["look_for_keys"] = False
+                if auth_method == "password":
                     if password:
                         connect_kwargs["password"] = password
-                elif password:
-                    connect_kwargs["password"] = password
-
-                if pkey_path:
-                    connect_kwargs["key_filename"] = pkey_path
+                elif auth_method == "key":
+                    if pkey_path:
+                        connect_kwargs["key_filename"] = pkey_path
+                else:  # "agent" — use SSH agent and/or auto-discover keys in ~/.ssh/
+                    connect_kwargs["allow_agent"] = True
+                    connect_kwargs["look_for_keys"] = True
 
                 client.connect(**connect_kwargs)
 

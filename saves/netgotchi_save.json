@@ -2,9 +2,9 @@
   "version": 1,
   "pet": {
     "name": "Byte",
-    "mood": 18.904743072885815,
-    "hunger": 24.281543117629393,
-    "energy": 5.281543117629398,
+    "mood": 12.66712171665057,
+    "hunger": 0,
+    "energy": 0,
     "xp": 135,
     "level": 2,
     "stage": "hatchling",
@@ -15,7 +15,7 @@
       "ping": 4,
       "nmap": 8
     },
-    "last_update": 1774138857.460624,
+    "last_update": 1775524942.6142774,
     "last_fed": 1773884271.0158482
   }
 }

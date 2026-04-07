@@ -393,37 +393,50 @@ class TargetInputScene(Scene):
 
 
 # ═══════════════════════════════════════════════════════════════════════
-#  SSH AUTH SCENE — Enter username/password/key path for SSH
+#  SSH AUTH SCENE — Select auth method then enter credentials
 # ═══════════════════════════════════════════════════════════════════════
 class SSHAuthScene(Scene):
-    """Collect SSH credentials from the user with masked password input.
+    """Collect SSH credentials with auth method selection.
 
-    ADDED FEATURE — Interactive SSH Authentication UI
-        Prompts user for three auth fields in sequence:
-        1. Username (default from system $USER or host config)
-        2. Password (displayed as asterisks for security)
-        3. Private key path (default ~/.ssh/id_rsa)
+    LEARNING NOTE — SSH authentication methods:
+        SSH supports multiple ways to prove your identity to a server:
+        - Password:   type your login password (simple, works everywhere)
+        - Key File:   use an RSA/Ed25519 private key (~/.ssh/id_rsa etc.)
+                      Much more secure and automatable than passwords.
+        - Agent/Auto: delegate to ssh-agent (a running key daemon) or let
+                      paramiko search ~/.ssh/ automatically.
 
-    Flow:
-        - User navigates fields with UP/DOWN arrows
-        - ENTER moves to next field or submits all three
-        - ESC cancels and returns to host selection
-        - Password is masked but stored in auth_data
-        - Keyboard-interactive flag set if password provided
+        Picking ONE method keeps auth predictable. Mixing them lets
+        paramiko try them in an undefined order, making failures hard
+        to diagnose — a common source of "why won't it connect?" bugs.
+
+    Two-phase flow:
+        Phase "method" — pick: Password / Key File / Agent / Auto
+        Phase "fields" — enter only the fields that method needs
 
     Integration:
-        - Called by SSHScene when host is selected (via _prompt_auth)
-        - Callback (_on_auth_done) wires auth_data into _start_shell()
-        - Enables pygame.key.set_repeat() for text input
-        - Cleans up with on_exit() to prevent key repeat persistence bugs
+        - Called by SSHScene._prompt_auth() when a host is selected
+        - Callback (_on_auth_done) receives (host_info, auth_data)
+        - Key repeat enabled only during field entry, cleaned up on exit
     """
 
-    FIELDS = ["username", "password", "pkey_path"]
+    METHODS = ["Password", "Key File", "Agent / Auto"]
+    METHOD_KEYS = ["password", "key", "agent"]
+
+    # Only the fields each method actually needs
+    FIELDS_FOR = {
+        "password": ["username", "password"],
+        "key":      ["username", "pkey_path"],
+        "agent":    ["username"],
+    }
 
     def __init__(self, game, host_info, callback):
         self.game = game
         self.host_info = host_info
         self.callback = callback
+        self.phase = "method"
+        self.method_index = 0
+        self.auth_method = None
         self.field_index = 0
         self.values = {
             "username": host_info.get("user") or os.getenv("USER", "admin"),
@@ -431,63 +444,80 @@ class SSHAuthScene(Scene):
             "pkey_path": "~/.ssh/id_rsa",
         }
         self.dialog = DialogBox(game.font, x=4, y=104, width=152, height=36)
-        self.dialog.set_text(f"Auth for {host_info.get('name', host_info.get('host', 'host'))}")
+        self.dialog.set_text(
+            f"Auth for {host_info.get('name', host_info.get('host', 'host'))}"
+        )
         self._cursor_timer = 0.0
         self._cursor_visible = True
-        pygame.key.set_repeat(400, 50)
 
     def on_exit(self):
-        """Clean up when leaving auth scene.
-
-        BUG FIX — Key repeat persistence
-        Disables pygame.key.set_repeat() on exit to prevent the repeater
-        from persisting into the next scene. Without this, key repeat would
-        remain active and break input in scenes that don't expect it.
-        """
+        """Disable key repeat so it doesn't bleed into the next scene."""
         pygame.key.set_repeat(0)
+
+    def _fields(self):
+        return self.FIELDS_FOR[self.auth_method]
+
+    def _enter_fields(self):
+        """Transition from method selection into field entry."""
+        self.auth_method = self.METHOD_KEYS[self.method_index]
+        self.field_index = 0
+        self.phase = "fields"
+        # Enable key repeat so backspace and navigation feel responsive
+        pygame.key.set_repeat(400, 50)
+
+    def _submit(self):
+        auth_data = {
+            "auth_method": self.auth_method,
+            "username": self.values["username"].strip(),
+            "password": self.values["password"] if self.auth_method == "password" else "",
+            "pkey_path": self.values["pkey_path"].strip() if self.auth_method == "key" else "",
+        }
+        self.game.scene_manager.pop()
+        self.callback(self.host_info, auth_data)
 
     def update(self, input_state, dt):
         self.dialog.update(dt)
 
-        if input_state.pressed(B):
-            self.game.scene_manager.pop()
+        # ── Method selection phase ──────────────────────────────────
+        if self.phase == "method":
+            if input_state.pressed(B):
+                self.game.scene_manager.pop()
+                return
+            if input_state.pressed(UP):
+                self.method_index = max(0, self.method_index - 1)
+            elif input_state.pressed(DOWN):
+                self.method_index = min(len(self.METHODS) - 1, self.method_index + 1)
+            elif input_state.pressed(A):
+                self._enter_fields()
             return
 
-        # Handle character entry for active field
-        current_field = self.FIELDS[self.field_index]
+        # ── Field entry phase ───────────────────────────────────────
+        if input_state.pressed(B):
+            # B in fields → go back to method picker, not all the way to host list
+            self.phase = "method"
+            pygame.key.set_repeat(0)
+            return
+
+        fields = self._fields()
+        current_field = fields[self.field_index]
 
         for char in input_state.text_events:
-            if current_field == "password":
-                if len(self.values["password"]) < 60:
-                    self.values["password"] += char
-            else:
-                if len(self.values[current_field]) < 60:
-                    self.values[current_field] += char
+            if len(self.values[current_field]) < 60:
+                self.values[current_field] += char
 
         for event in input_state.key_events:
             if event.key == pygame.K_BACKSPACE:
                 self.values[current_field] = self.values[current_field][:-1]
             elif event.key == pygame.K_RETURN:
-                if self.field_index < len(self.FIELDS) - 1:
+                if self.field_index < len(fields) - 1:
                     self.field_index += 1
                 else:
-                    # Submit
-                    auth_data = {
-                        "username": self.values["username"].strip(),
-                        "password": self.values["password"],
-                        "pkey_path": self.values["pkey_path"].strip(),
-                        "keyboard_interactive": bool(self.values["password"]),
-                    }
-                    self.game.scene_manager.pop()
-                    self.callback(self.host_info, auth_data)
+                    self._submit()
                     return
-            elif event.key == pygame.K_ESCAPE:
-                self.game.scene_manager.pop()
-                return
             elif event.key == pygame.K_UP:
                 self.field_index = max(0, self.field_index - 1)
             elif event.key == pygame.K_DOWN:
-                self.field_index = min(len(self.FIELDS) - 1, self.field_index + 1)
+                self.field_index = min(len(fields) - 1, self.field_index + 1)
 
         self._cursor_timer += dt
         if self._cursor_timer >= 0.5:
@@ -502,28 +532,43 @@ class SSHAuthScene(Scene):
         renderer.draw_rect(0, 0, 160, 10, (8, 30, 8))
         font.draw(surface, "[ SSH AUTH ]", 40, 1, CYAN)
 
-        y = 20
-        for i, field in enumerate(self.FIELDS):
-            label = field.replace("_", " ").title()
-            value = self.values[field]
-            if field == "password":
-                value = "*" * len(value)
+        if self.phase == "method":
+            font.draw(surface, "Select auth method:", 4, 14, WHITE)
+            y = 28
+            for i, method in enumerate(self.METHODS):
+                prefix = ">" if i == self.method_index else " "
+                color = GREEN if i == self.method_index else WHITE
+                font.draw(surface, f"{prefix} {method}", 4, y, color)
+                y += 12
+            font.draw(surface, "A/ENTER=select  B/ESC=back", 4, 100, GRAY)
 
-            prefix = ">" if i == self.field_index else " "
-            font.draw(surface, f"{prefix} {label}: {value[:18]}", 4, y, GREEN if i == self.field_index else WHITE)
-            y += 10
+        else:
+            # Show active method as subheading
+            font.draw(surface, self.METHODS[self.method_index], 4, 14, CYAN)
 
-        cursor = "_" if self._cursor_visible else " "
-        current = self.FIELDS[self.field_index]
-        displayed = self.values[current]
-        if current == "password":
-            displayed = "*" * len(displayed)
-        if len(displayed) > 24:
-            displayed = displayed[-24:]
+            fields = self._fields()
+            y = 28
+            for i, field in enumerate(fields):
+                label = field.replace("_", " ").title()
+                value = self.values[field]
+                if field == "password":
+                    value = "*" * len(value)
+                prefix = ">" if i == self.field_index else " "
+                color = GREEN if i == self.field_index else WHITE
+                font.draw(surface, f"{prefix} {label}: {value[:16]}", 4, y, color)
+                y += 10
 
-        font.draw(surface, f"{current}: {displayed}{cursor}", 4, 90, YELLOW)
-        font.draw(surface, "ENTER=next/done UP/DOWN switch", 4, 100, GRAY)
-        font.draw(surface, "ESC=cancel", 4, 110, GRAY)
+            # Editable view of current field at the bottom
+            cursor = "_" if self._cursor_visible else " "
+            current = fields[self.field_index]
+            displayed = self.values[current]
+            if current == "password":
+                displayed = "*" * len(displayed)
+            if len(displayed) > 22:
+                displayed = displayed[-22:]
+            font.draw(surface, f"{displayed}{cursor}", 4, 82, YELLOW)
+            font.draw(surface, "ENTER=next/done  UP/DN=switch", 4, 94, GRAY)
+            font.draw(surface, "B/ESC=back to method", 4, 104, GRAY)
 
         self.dialog.draw(surface)
 
@@ -778,7 +823,7 @@ class SSHScene(Scene):
         """Callback when user submits auth form in SSHAuthScene.
 
         ADDED FEATURE — Auth → Shell Bridge
-            Stores auth_data (username, password, pkey_path, keyboard_interactive)
+            Stores auth_data (auth_method, username, password/pkey_path)
             into scene state, then initiates _start_shell() which passes these
             credentials into SSHTool.open_shell().
         """
@@ -832,10 +877,9 @@ class SSHScene(Scene):
             incrementally (not batch).
 
         Auth Integration:
-            Pulls username, password, pkey_path, and keyboard_interactive
-            from auth_data dict (populated by SSHAuthScene._on_auth_done).
-            Falls back to host_info or default values if auth_data is empty
-            (allows quick-connect without auth if desired).
+            Pulls auth_method, username, password/pkey_path from auth_data
+            (populated by SSHAuthScene._on_auth_done). Falls back to
+            host_info defaults if auth_data is absent.
 
         Session Callbacks:
             - on_output: appends chunks to shell_output_lines (UI update)
@@ -857,9 +901,7 @@ class SSHScene(Scene):
             "username": (self.auth_data or {}).get("username") or self.selected_host.get("user") or None,
             "password": (self.auth_data or {}).get("password"),
             "pkey_path": (self.auth_data or {}).get("pkey_path"),
-            "keyboard_interactive": (self.auth_data or {}).get("keyboard_interactive", False),
-            "allow_agent": True,
-            "look_for_keys": True,
+            "auth_method": (self.auth_data or {}).get("auth_method", "agent"),
         }
 
         self.shell_session = self.ssh_tool.open_shell(
@@ -899,7 +941,7 @@ class SSHScene(Scene):
             "username": (self.auth_data or {}).get("username") or h.get("user"),
             "password": (self.auth_data or {}).get("password"),
             "pkey_path": (self.auth_data or {}).get("pkey_path"),
-            "keyboard_interactive": (self.auth_data or {}).get("keyboard_interactive", False),
+            "auth_method": (self.auth_data or {}).get("auth_method", "agent"),
         }
         self.ssh_tool.run(params, callback=self._on_ssh_done)
 
