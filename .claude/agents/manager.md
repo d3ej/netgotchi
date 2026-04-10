@@ -1,0 +1,1 @@
+../agent-skills/agents/teams/network-team/manager.md

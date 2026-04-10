@@ -1,0 +1,3 @@
+[submodule ".claude/agent-skills"]
+	path = .claude/agent-skills
+	url = https://github.com/d3ej/agent-skills
