@@ -791,6 +791,10 @@ class SSHScene(Scene):
         self.shell_output_lines = []
         self.shell_scroll = 0
         self.auth_data = None
+        # Set by the worker thread; consumed by update() on the main thread so
+        # that pygame state (key repeat, dialog, phase) is only touched from
+        # the main thread.
+        self._shell_close_pending = None
 
         # CLI typing state
         self._cli_buffer = ""       # What the user has typed so far
@@ -860,12 +864,9 @@ class SSHScene(Scene):
         self._append_shell_output(chunk)
 
     def _on_shell_close(self, success, error):
-        if not success and error:
-            self._append_shell_output(f"Shell error: {error}")
-
-        self.shell_session = None
-        self.dialog.set_text("SSH session closed. Press Esc to go back.")
-        self.phase = "host"
+        # Called from the SSH worker thread — only set a flag; all pygame
+        # and scene-state writes happen in update() on the main thread.
+        self._shell_close_pending = (success, error)
 
     def _start_shell(self):
         """Initiate interactive SSH shell with credentials.
@@ -1002,11 +1003,23 @@ class SSHScene(Scene):
 
         # ── Shell interactive phase ─────────────────────────────────
         if self.phase == "shell":
-            # Scrolling output with arrows
+            # Process deferred close signal from the worker thread.
+            if self._shell_close_pending is not None:
+                _, error = self._shell_close_pending
+                self._shell_close_pending = None
+                if error:
+                    self._append_shell_output(f"Shell error: {error}")
+                self.shell_session = None
+                pygame.key.set_repeat(0)
+                self.dialog.set_text("Session closed. Press Esc.")
+                self.phase = "host"
+                return
+
+            # UP = scroll back through history; DOWN = return to newest output.
             if input_state.pressed(UP):
-                self.shell_scroll = max(0, self.shell_scroll - 1)
-            elif input_state.pressed(DOWN):
                 self.shell_scroll += 1
+            elif input_state.pressed(DOWN):
+                self.shell_scroll = max(0, self.shell_scroll - 1)
 
             # Type commands into local buffer
             for char in input_state.text_events:
@@ -1023,9 +1036,11 @@ class SSHScene(Scene):
                         if self.shell_session and self.shell_session.get("send"):
                             self.shell_session["send"](line + "\n")
                         self.shell_buffer = ""
+                        self.shell_scroll = 0  # Jump back to newest output after sending
                     return
                 elif event.key == pygame.K_ESCAPE:
                     self._cleanup_shell()
+                    pygame.key.set_repeat(0)
                     self.phase = "host"
                     self.shell_buffer = ""
                     self.dialog.set_text("Select SSH target:")
@@ -1129,6 +1144,8 @@ class SSHScene(Scene):
 
             # Show shell history (scrollable)
             max_lines = 8
+            max_scroll = max(0, len(self.shell_output_lines) - max_lines)
+            self.shell_scroll = min(self.shell_scroll, max_scroll)
             start = max(0, len(self.shell_output_lines) - max_lines - self.shell_scroll)
             visible_lines = self.shell_output_lines[start:start + max_lines]
             y = 26
