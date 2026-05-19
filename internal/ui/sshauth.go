@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/d3ej/netgotchi/internal/styles"
 	"github.com/d3ej/netgotchi/internal/tools"
 )
@@ -201,10 +202,12 @@ func (m sshAuthModel) submit() tea.Cmd {
 
 func (m sshAuthModel) view() string {
 	var sb strings.Builder
+	innerW := 38
 
-	sb.WriteString(styles.Green.Bold(true).Render("[ SSH AUTH ]"))
+	header := styles.ToolHeader.Width(innerW).Align(lipgloss.Center).Render("SSH AUTH")
+	sb.WriteString(header)
 	sb.WriteByte('\n')
-	sb.WriteString(styles.Dim.Render(strings.Repeat("─", 40)))
+	sb.WriteString(styles.Separator(innerW))
 	sb.WriteByte('\n')
 
 	switch m.phase {

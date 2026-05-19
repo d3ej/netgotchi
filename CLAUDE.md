@@ -6,7 +6,8 @@ runs real network tools (ping, SSH, nmap) from a full-screen terminal UI while
 caring for a virtual pet that evolves as you use the tools.
 
 **Tech stack:** Go 1.21+, Bubbletea v1.1, Lip Gloss v0.13, Bubbles v0.20,
-`golang.org/x/crypto` (SSH), system `ping` and `nmap` binaries.
+`golang.org/x/crypto` (SSH), `gopkg.in/yaml.v3` (YAML export),
+system `ping` and `nmap` binaries.
 
 > **Legacy Python version:** The original pygame implementation lives in
 > `main.py` and `netgotchi/` (Python package). The Go TUI is now the primary
@@ -31,18 +32,21 @@ netgotchi/
 │   │   ├── hosts.go           # Host discovery (~/.ssh/config, /etc/hosts)
 │   │   ├── ping.go            # System ping via os/exec
 │   │   ├── ssh.go             # SSH client (golang.org/x/crypto/ssh)
-│   │   └── scanner.go         # Nmap via os/exec + XML parsing
+│   │   ├── scanner.go         # Nmap via os/exec + XML parsing
+│   │   ├── session.go         # ScanSession — accumulates discovered hosts
+│   │   └── exporter.go        # Export to JSON/YAML/NetBox/Ansible formats
 │   └── ui/
 │       ├── messages.go        # All tea.Msg types + Page enum + cmd helpers
 │       ├── app.go             # Root AppModel — navigation stack, ticks, save
 │       ├── overworld.go       # Home screen: pet sprite + stat bars
-│       ├── mainmenu.go        # TOOLS / PET / STATUS / SAVE / QUIT
+│       ├── mainmenu.go        # TOOLS / PET / STATUS / EXPORT / SAVE / QUIT
 │       ├── toolmenu.go        # PING / SSH / NMAP / BACK
 │       ├── ping.go            # Ping scene (target select → async → result)
 │       ├── sshauth.go         # SSH auth scene (host → method → credentials)
 │       ├── sshshell.go        # Interactive SSH shell with viewport
 │       ├── scanner.go         # Nmap scene (target → scan type → result)
-│       └── petstatus.go       # Full-screen pet stats
+│       ├── petstatus.go       # Full-screen pet stats
+│       └── export.go          # Export scene (format select → write → confirm)
 ├── saves/                     # Runtime save data (gitignored)
 ├── main.py                    # Legacy pygame entry point
 └── netgotchi/                 # Legacy Python package
@@ -139,7 +143,13 @@ All Lip Gloss styles live in one place.  Key helpers:
 - `styles.Bar(pct, width, fill, empty)` — renders a filled progress bar
 - `styles.StatBar(label, pct, width)` — label + bar + percentage string
 - Pre-built styles: `styles.Green`, `styles.Red`, `styles.Cyan`, `styles.Dim`,
-  `styles.Header`, `styles.AppBox`, `styles.Terminal`, etc.
+  `styles.Header`, `styles.ToolHeader`, `styles.AppBox`, `styles.Terminal`,
+  `styles.ResultBoxGood`, `styles.ResultBoxBad`, etc.
+- `styles.GradientBar(pct, width)` — Unicode block chars with threshold-based
+  color (green > 55%, yellow > 25%, red ≤ 25%)
+- `styles.GradientStatBar(label, pct, width)` — labeled version with colored percentage
+- `styles.Badge(text, fg, bg)` — small highlighted label pill
+- `styles.Separator(width)` / `styles.DashedSep(width)` — horizontal rules
 
 ---
 
@@ -228,6 +238,45 @@ Result `Data["hosts"]` is `[]ScanHost` with IP, hostname, state, and open ports.
 `DiscoverHosts() []Host` — merges `~/.ssh/config` (Host/HostName/User/Port)
 and `/etc/hosts` (skipping loopback and link-local).  Always includes
 `localhost (127.0.0.1:22)`.
+
+### Session accumulation (`session.go`)
+
+`ScanSession` aggregates all discovered hosts across the current application
+run, keyed by IP address.
+
+```go
+type DiscoveredHost struct {
+    IP, Hostname, State string
+    Ports        []ScanPort
+    RTTMs        float64
+    SSHUser      string    // never contains passwords
+    Tags, Sources []string
+    DiscoveredAt time.Time
+}
+```
+
+`AppModel` holds a `*tools.ScanSession` and feeds it automatically in
+`Update()` whenever a `pingResultMsg`, `scanResultMsg`, or `sshConnectedMsg`
+arrives — no extra wiring needed in tool scenes.
+
+### Export (`exporter.go`)
+
+`Export(session, format, dir) (path string, err error)` — writes a snapshot
+of the session to `dir/` with permissions `0o600` (dir `0o700`).
+
+| `ExportFormat`    | File pattern            | Schema                                |
+|-------------------|-------------------------|---------------------------------------|
+| `ExportGenericJSON` | `netgotchi-YYYYMMDD-HHMMSS.json` | `NetworkInventory{Meta, Hosts[]}` |
+| `ExportGenericYAML` | `netgotchi-…yaml`      | same, YAML encoded                    |
+| `ExportNetBoxJSON`  | `netbox-…json`         | `{devices[], ip_addresses[], services[]}` |
+| `ExportAnsibleYAML` | `ansible-…yaml`        | `all.hosts` map with `ansible_host`, `ansible_user`, `open_ports`, `rtt_ms` |
+
+**Security:** SSH passwords are never stored anywhere; `SSHUser` (username
+only) is the only SSH credential that appears in exports.
+
+NetBox format notes: `device_type`, `role`, and `site` are required by the
+NetBox API but not discoverable via the tools — the export uses placeholders
+that you must replace before importing via `POST /api/dcim/devices/`.
 
 ---
 
