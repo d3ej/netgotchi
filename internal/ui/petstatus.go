@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/d3ej/netgotchi/internal/pet"
 	"github.com/d3ej/netgotchi/internal/styles"
 )
@@ -33,28 +34,44 @@ func (m petStatusModel) update(msg tea.Msg) (petStatusModel, tea.Cmd) {
 func (m petStatusModel) view() string {
 	p := m.p
 	var sb strings.Builder
+	innerW := 36
 
-	sb.WriteString(styles.Magenta.Bold(true).Render("[ PET STATUS ]"))
+	// Header bar with magenta accent
+	header := lipgloss.NewStyle().
+		Background(lipgloss.Color("#1A0A2E")).
+		Foreground(styles.ColMagenta).
+		Bold(true).
+		Width(innerW).
+		Align(lipgloss.Center).
+		Render("◈  PET STATUS  ◈")
+	sb.WriteString(header)
 	sb.WriteByte('\n')
-	sb.WriteString(styles.Dim.Render(strings.Repeat("─", 36)))
+	sb.WriteString(lipgloss.NewStyle().Foreground(styles.ColMagenta).Render(strings.Repeat("▔", innerW)))
+	sb.WriteByte('\n')
 	sb.WriteByte('\n')
 
 	// Identity
-	sb.WriteString(fmt.Sprintf("  %s  %s  Lv. %s\n",
+	sb.WriteString(fmt.Sprintf("  %s  ·  %s  ·  Lv. %s\n",
 		styles.Cyan.Render(p.Name),
 		styles.Dim.Render(pet.StageTitles[p.Stage]),
-		styles.Yellow.Render(fmt.Sprintf("%d", p.Level)),
+		styles.Yellow.Bold(true).Render(fmt.Sprintf("%d", p.Level)),
 	))
 	sb.WriteByte('\n')
 
-	// Stat bars
+	// Gradient stat bars
 	barW := 14
-	sb.WriteString(styles.StatBar("MOOD  ", p.Mood, barW))
+	sb.WriteString(styles.GradientStatBar("MOOD  ", p.Mood, barW))
 	sb.WriteString("  " + styles.Dim.Render(pet.MoodName(p.Mood)))
 	sb.WriteByte('\n')
-	sb.WriteString(styles.StatBar("HUNGER", p.Hunger, barW))
+	sb.WriteString(styles.GradientStatBar("HUNGER", p.Hunger, barW))
+	if p.IsHungry() {
+		sb.WriteString("  " + styles.Badge("HUNGRY", styles.ColDarkBG, styles.ColRed))
+	}
 	sb.WriteByte('\n')
-	sb.WriteString(styles.StatBar("ENERGY", p.Energy, barW))
+	sb.WriteString(styles.GradientStatBar("ENERGY", p.Energy, barW))
+	if p.IsTired() {
+		sb.WriteString("  " + styles.Badge("TIRED", styles.ColDarkBG, styles.ColYellow))
+	}
 	sb.WriteByte('\n')
 	sb.WriteByte('\n')
 
@@ -67,27 +84,29 @@ func (m petStatusModel) view() string {
 			xpPct = 100
 		}
 	}
-	xpBar := styles.Bar(xpPct, barW, styles.XPFill, styles.BarEmpty)
-	sb.WriteString(fmt.Sprintf("  XP %s %d / %d\n",
-		xpBar,
-		cur, needed,
-	))
+	xpBar := lipgloss.NewStyle().Foreground(styles.ColBlue).Width(8).Render("XP") +
+		" " + styles.GradientBar(xpPct, barW) +
+		" " + styles.Dim.Render(fmt.Sprintf("%d / %d", cur, needed))
+	sb.WriteString(xpBar)
+	sb.WriteByte('\n')
+	sb.WriteByte('\n')
+
+	sb.WriteString(styles.DashedSep(innerW))
 	sb.WriteByte('\n')
 
 	// Lifetime stats
-	sb.WriteString(styles.Dim.Render("  Lifetime stats"))
-	sb.WriteByte('\n')
-	sb.WriteString(fmt.Sprintf("    Pings  : %d\n", p.TotalPings))
-	sb.WriteString(fmt.Sprintf("    Scans  : %d\n", p.TotalScans))
-	sb.WriteString(fmt.Sprintf("    Hosts  : %d\n", p.TotalHostsFound))
+	sb.WriteString(styles.Dim.Render("  Lifetime stats") + "\n")
+	sb.WriteString(fmt.Sprintf("    Pings  : %s\n", styles.Cyan.Render(fmt.Sprintf("%d", p.TotalPings))))
+	sb.WriteString(fmt.Sprintf("    Scans  : %s\n", styles.Cyan.Render(fmt.Sprintf("%d", p.TotalScans))))
+	sb.WriteString(fmt.Sprintf("    Hosts  : %s\n", styles.Cyan.Render(fmt.Sprintf("%d", p.TotalHostsFound))))
 	sb.WriteByte('\n')
 
 	// Tool affinity
 	if len(p.ToolAffinity) > 0 {
-		sb.WriteString(styles.Dim.Render("  Tool affinity"))
-		sb.WriteByte('\n')
+		sb.WriteString(styles.Dim.Render("  Tool affinity") + "\n")
 		for tool, count := range p.ToolAffinity {
-			sb.WriteString(fmt.Sprintf("    %-8s : %d\n", tool, count))
+			bar := styles.GradientBar(float64(count)*5, 8) // visual scale
+			sb.WriteString(fmt.Sprintf("    %-8s %s %d\n", tool, bar, count))
 		}
 		sb.WriteByte('\n')
 	}

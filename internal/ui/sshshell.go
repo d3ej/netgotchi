@@ -185,24 +185,53 @@ func (m *sshShellModel) appendOutput(text string) {
 	m.viewport.GotoBottom()
 }
 
+func (m sshShellModel) phaseLabel() (string, lipgloss.Color) {
+	switch m.phase {
+	case shellPhaseConnecting:
+		return "CONNECTING", styles.ColYellow
+	case shellPhaseActive:
+		return "ACTIVE", styles.ColGreen
+	case shellPhaseClosed:
+		return "CLOSED", styles.ColGray
+	default:
+		return "ERROR", styles.ColRed
+	}
+}
+
 func (m sshShellModel) view() string {
 	var sb strings.Builder
+	innerW := m.width - 6 // AppBox border + padding
 
+	// Full-width header bar with right-aligned phase badge
 	host := m.params.Host
-	sb.WriteString(styles.Green.Bold(true).Render(fmt.Sprintf("[ SSH  %s ]", host)))
+	phaseText, phaseCol := m.phaseLabel()
+	phaseBadge := styles.Badge(phaseText, styles.ColDarkBG, phaseCol)
+
+	hostLabel := styles.ToolHeader.Render(fmt.Sprintf(" SSH  %s", host))
+	headerBar := lipgloss.NewStyle().
+		Background(styles.ColToolHeaderBG).
+		Width(innerW).
+		Render(
+			lipgloss.JoinHorizontal(lipgloss.Top,
+				lipgloss.NewStyle().Background(styles.ColToolHeaderBG).Width(innerW-lipgloss.Width(phaseBadge)-1).Render(hostLabel),
+				phaseBadge,
+			),
+		)
+	sb.WriteString(headerBar)
 	sb.WriteByte('\n')
-	sb.WriteString(styles.Dim.Render(strings.Repeat("─", m.width-4)))
+	sb.WriteString(styles.Separator(innerW))
 	sb.WriteByte('\n')
 
 	switch m.phase {
 	case shellPhaseConnecting:
+		sb.WriteByte('\n')
 		sb.WriteString(m.spinner.View())
 		sb.WriteString(styles.Yellow.Render(fmt.Sprintf("  Connecting to %s…", host)))
 
 	case shellPhaseActive:
 		sb.WriteString(styles.Terminal.Render(m.viewport.View()))
 		sb.WriteByte('\n')
-		sb.WriteString(styles.Dim.Render(strings.Repeat("─", m.width-4)))
+		sb.WriteString(styles.DashedSep(innerW))
 		sb.WriteByte('\n')
 		sb.WriteString(m.input.View())
 		sb.WriteByte('\n')
@@ -211,14 +240,17 @@ func (m sshShellModel) view() string {
 	case shellPhaseClosed:
 		sb.WriteString(styles.Terminal.Render(m.viewport.View()))
 		sb.WriteByte('\n')
+		sb.WriteString(styles.DashedSep(innerW))
+		sb.WriteByte('\n')
 		sb.WriteString(styles.Yellow.Render("Session ended."))
 		sb.WriteByte('\n')
 		sb.WriteString(styles.Hint.Render("esc / q  back"))
 
 	case shellPhaseError:
-		sb.WriteString(styles.Red.Render("✗ Connection failed"))
 		sb.WriteByte('\n')
-		sb.WriteString(styles.Dim.Render(truncate(m.errMsg, m.width-6)))
+		sb.WriteString(styles.Red.Bold(true).Render("✗ Connection failed"))
+		sb.WriteByte('\n')
+		sb.WriteString(styles.Dim.Render(truncate(m.errMsg, innerW)))
 		sb.WriteByte('\n')
 		sb.WriteString(styles.Hint.Render("esc / q  back"))
 	}

@@ -12,7 +12,7 @@ import (
 
 type overworldModel struct {
 	p         *pet.Pet
-	animFrame bool // toggles between idle and alternate animation
+	animFrame bool
 	width     int
 	height    int
 }
@@ -49,47 +49,60 @@ func (m overworldModel) view() string {
 	}
 
 	sprite := pet.GetSprite(p.Stage, anim)
+	boxWidth := m.width - 2
+	innerWidth := boxWidth - 4 // border + padding
 
 	var sb strings.Builder
 
-	// Title bar
-	title := styles.Title.Render("◈ NETGOTCHI ◈")
-	sb.WriteString(lipgloss.PlaceHorizontal(m.width-4, lipgloss.Center, title))
-	sb.WriteByte('\n')
-	sb.WriteString(styles.Dim.Render(strings.Repeat("─", m.width-4)))
+	// Title banner with solid background
+	titleText := "◈  N E T G O T C H I  ◈"
+	titleBar := lipgloss.NewStyle().
+		Background(styles.ColHeaderBG).
+		Foreground(styles.ColCyan).
+		Bold(true).
+		Width(innerWidth).
+		Align(lipgloss.Center).
+		Render(titleText)
+	sb.WriteString(titleBar)
 	sb.WriteByte('\n')
 
-	// Pet name / stage / level line
+	// Cyan accent line
+	sb.WriteString(lipgloss.NewStyle().Foreground(styles.ColCyan).Render(strings.Repeat("▔", innerWidth)))
+	sb.WriteByte('\n')
+
+	// Pet name / stage / level
 	nameLine := fmt.Sprintf("%s  ·  %s  ·  Lv.%d",
 		styles.Cyan.Render(p.Name),
 		styles.Dim.Render(pet.StageTitles[p.Stage]),
 		p.Level,
 	)
-	sb.WriteString(lipgloss.PlaceHorizontal(m.width-4, lipgloss.Center, nameLine))
+	sb.WriteString(lipgloss.PlaceHorizontal(innerWidth, lipgloss.Center, nameLine))
 	sb.WriteByte('\n')
 	sb.WriteByte('\n')
 
 	// Sprite
 	for _, line := range sprite.Lines {
 		colored := lipgloss.NewStyle().Foreground(spriteColor(p.Stage)).Render(line)
-		sb.WriteString(lipgloss.PlaceHorizontal(m.width-4, lipgloss.Center, colored))
+		sb.WriteString(lipgloss.PlaceHorizontal(innerWidth, lipgloss.Center, colored))
 		sb.WriteByte('\n')
 	}
 	sb.WriteByte('\n')
 
-	// Stat bars
-	barW := 12
-	sb.WriteString(styles.StatBar("MOOD  ", p.Mood, barW))
+	// Stat bars — gradient with threshold coloring
+	barW := 14
+	sb.WriteString(styles.GradientStatBar("MOOD  ", p.Mood, barW))
 	sb.WriteString("  " + styles.Dim.Render(pet.MoodName(p.Mood)))
 	sb.WriteByte('\n')
-	sb.WriteString(styles.StatBar("HUNGER", p.Hunger, barW))
+
+	sb.WriteString(styles.GradientStatBar("HUNGER", p.Hunger, barW))
 	if p.IsHungry() {
-		sb.WriteString("  " + styles.Red.Render("hungry!"))
+		sb.WriteString("  " + styles.Badge("HUNGRY", styles.ColDarkBG, styles.ColRed))
 	}
 	sb.WriteByte('\n')
-	sb.WriteString(styles.StatBar("ENERGY", p.Energy, barW))
+
+	sb.WriteString(styles.GradientStatBar("ENERGY", p.Energy, barW))
 	if p.IsTired() {
-		sb.WriteString("  " + styles.Yellow.Render("tired!"))
+		sb.WriteString("  " + styles.Badge("TIRED", styles.ColDarkBG, styles.ColYellow))
 	}
 	sb.WriteByte('\n')
 	sb.WriteByte('\n')
@@ -103,18 +116,21 @@ func (m overworldModel) view() string {
 			xpPct = 100
 		}
 	}
-	xpBar := styles.Bar(xpPct, barW, styles.XPFill, styles.BarEmpty)
-	xpLine := styles.Dim.Render("XP") + " " + xpBar +
+	xpBar := styles.GradientBar(xpPct, barW)
+	xpLine := lipgloss.NewStyle().Foreground(styles.ColBlue).Width(8).Render("XP") +
+		" " + xpBar +
 		" " + styles.Dim.Render(fmt.Sprintf("%d / %d", cur, needed))
 	sb.WriteString(xpLine)
 	sb.WriteByte('\n')
 	sb.WriteByte('\n')
 
-	// Footer hint
-	sb.WriteString(styles.Hint.Render("[ SPACE / ENTER ]  open menu"))
+	// Dashed separator before footer
+	sb.WriteString(styles.DashedSep(innerWidth))
+	sb.WriteByte('\n')
+	sb.WriteString(lipgloss.PlaceHorizontal(innerWidth, lipgloss.Center,
+		styles.Hint.Render("[ SPACE / ENTER ]  open menu")))
 
-	inner := sb.String()
-	return styles.AppBox.Width(m.width - 2).Render(inner)
+	return styles.AppBox.Width(boxWidth).Render(sb.String())
 }
 
 func spriteColor(s pet.Stage) lipgloss.Color {

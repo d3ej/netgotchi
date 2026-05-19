@@ -1,10 +1,10 @@
 package ui
 
 import (
-	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/d3ej/netgotchi/internal/styles"
 )
 
@@ -15,7 +15,18 @@ type mainMenuModel struct {
 	height int
 }
 
-var mainMenuItems = []string{"TOOLS", "PET", "STATUS", "SAVE", "QUIT"}
+var mainMenuItems = []string{"TOOLS", "PET", "STATUS", "EXPORT", "SAVE", "QUIT"}
+
+var menuIcons = map[string]string{
+	"TOOLS":  "⚙",
+	"PET":    "♥",
+	"STATUS": "◈",
+	"EXPORT": "↯",
+	"SAVE":   "▸",
+	"QUIT":   "✕",
+}
+
+const menuBoxWidth = 28
 
 func newMainMenuModel(w, h int) mainMenuModel {
 	return mainMenuModel{items: mainMenuItems, width: w, height: h}
@@ -50,6 +61,8 @@ func (m mainMenuModel) selectItem() tea.Cmd {
 		return cmdNavigate(PagePetStatus)
 	case "STATUS":
 		return cmdNavigate(PagePetStatus)
+	case "EXPORT":
+		return cmdNavigate(PageExport)
 	case "SAVE":
 		return cmdSave()
 	case "QUIT":
@@ -59,26 +72,40 @@ func (m mainMenuModel) selectItem() tea.Cmd {
 }
 
 func (m mainMenuModel) view() string {
+	innerW := menuBoxWidth - 4 // border + padding
+
 	var sb strings.Builder
 
-	sb.WriteString(styles.Header.Render("[ MAIN MENU ]"))
+	// Header bar
+	header := styles.Header.Width(innerW).Align(lipgloss.Center).Render("MAIN MENU")
+	sb.WriteString(header)
 	sb.WriteByte('\n')
-	sb.WriteString(styles.Dim.Render(strings.Repeat("─", 22)))
+	sb.WriteString(styles.Separator(innerW))
+	sb.WriteByte('\n')
 	sb.WriteByte('\n')
 
 	for i, item := range m.items {
+		icon := menuIcons[item]
+		label := icon + "  " + item
+
 		var line string
 		if i == m.cursor {
-			line = styles.Selected.Render(fmt.Sprintf("  ▸ %-10s", item))
+			line = styles.Selected.
+				Width(innerW).
+				Render("  " + label)
 		} else {
-			line = styles.Normal.Render(fmt.Sprintf("    %-10s", item))
+			line = styles.Normal.
+				Width(innerW).
+				Render("    " + label)
 		}
 		sb.WriteString(line)
 		sb.WriteByte('\n')
 	}
 
 	sb.WriteByte('\n')
+	sb.WriteString(styles.DashedSep(innerW))
+	sb.WriteByte('\n')
 	sb.WriteString(styles.Hint.Render("↑↓ nav  ↵ select  esc back"))
 
-	return styles.AppBox.Width(26).Render(sb.String())
+	return styles.AppBox.Width(menuBoxWidth).Render(sb.String())
 }

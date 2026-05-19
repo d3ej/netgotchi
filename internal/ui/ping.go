@@ -163,9 +163,11 @@ func (m pingModel) startPing(target string) (pingModel, tea.Cmd) {
 func (m pingModel) view() string {
 	var sb strings.Builder
 
-	sb.WriteString(styles.Green.Bold(true).Render("[ PING TOOL ]"))
+	innerW := 36
+	header := styles.ToolHeader.Width(innerW).Align(lipgloss.Center).Render("PING TOOL")
+	sb.WriteString(header)
 	sb.WriteByte('\n')
-	sb.WriteString(styles.Dim.Render(strings.Repeat("─", 36)))
+	sb.WriteString(styles.Separator(innerW))
 	sb.WriteByte('\n')
 
 	switch m.phase {
@@ -203,33 +205,36 @@ func (m pingModel) view() string {
 
 func (m pingModel) viewResult() string {
 	r := m.result
-	var sb strings.Builder
+	var inner strings.Builder
 
 	if r.Success {
-		sb.WriteString(styles.Green.Render("● PING OK"))
-		sb.WriteByte('\n')
-
+		inner.WriteString(styles.Green.Bold(true).Render("● PING OK") + "\n\n")
 		if rtt, ok := r.Data["rtt_avg"].(float64); ok && rtt >= 0 {
-			sb.WriteString(fmt.Sprintf("  RTT avg : %s\n", styles.Cyan.Render(fmt.Sprintf("%.2f ms", rtt))))
+			inner.WriteString(fmt.Sprintf("  RTT avg : %s\n", styles.Cyan.Render(fmt.Sprintf("%.2f ms", rtt))))
 		}
 		if loss, ok := r.Data["packet_loss"].(int); ok {
 			col := styles.Green
 			if loss > 0 {
 				col = styles.Red
 			}
-			sb.WriteString(fmt.Sprintf("  Loss    : %s\n", col.Render(fmt.Sprintf("%d%%", loss))))
+			inner.WriteString(fmt.Sprintf("  Loss    : %s\n", col.Render(fmt.Sprintf("%d%%", loss))))
 		}
-		sb.WriteString(fmt.Sprintf("  Time    : %.1fs\n", r.Duration))
-		sb.WriteString(styles.Cyan.Render(fmt.Sprintf("  +%d XP", r.XPReward)))
+		inner.WriteString(fmt.Sprintf("  Time    : %.1fs\n\n", r.Duration))
+		xpBadge := styles.Badge(fmt.Sprintf("+%d XP", r.XPReward), styles.ColDarkBG, styles.ColBlue)
+		inner.WriteString("  " + xpBadge)
 	} else {
-		sb.WriteString(styles.Red.Render("✗ PING FAILED"))
-		sb.WriteByte('\n')
-		sb.WriteString(styles.Dim.Render(truncate(r.Error, 36)))
+		inner.WriteString(styles.Red.Bold(true).Render("✗ PING FAILED") + "\n\n")
+		inner.WriteString(styles.Dim.Render("  " + truncate(r.Error, 34)))
 	}
 
-	sb.WriteByte('\n')
-	sb.WriteString(styles.Hint.Render("↵ / esc  back to menu"))
-	return sb.String()
+	inner.WriteString("\n\n")
+	inner.WriteString(styles.Hint.Render("  ↵ / esc  back to menu"))
+
+	resultBox := styles.ResultBoxGood
+	if !r.Success {
+		resultBox = styles.ResultBoxBad
+	}
+	return resultBox.Width(36).Render(inner.String())
 }
 
 func truncate(s string, n int) string {

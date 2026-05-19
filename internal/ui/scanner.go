@@ -198,10 +198,12 @@ func (m scannerModel) startScan() (scannerModel, tea.Cmd) {
 
 func (m scannerModel) view() string {
 	var sb strings.Builder
+	innerW := 38
 
-	sb.WriteString(styles.Cyan.Bold(true).Render("[ NMAP SCANNER ]"))
+	header := styles.ToolHeader.Width(innerW).Align(lipgloss.Center).Render("NMAP SCANNER")
+	sb.WriteString(header)
 	sb.WriteByte('\n')
-	sb.WriteString(styles.Dim.Render(strings.Repeat("─", 40)))
+	sb.WriteString(styles.Separator(innerW))
 	sb.WriteByte('\n')
 
 	switch m.phase {

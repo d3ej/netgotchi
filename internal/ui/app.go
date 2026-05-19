@@ -8,6 +8,7 @@ import (
 	"github.com/d3ej/netgotchi/internal/pet"
 	"github.com/d3ej/netgotchi/internal/save"
 	"github.com/d3ej/netgotchi/internal/styles"
+	"github.com/d3ej/netgotchi/internal/tools"
 )
 
 // AppModel is the root Bubbletea model.  It owns the navigation stack and
@@ -28,7 +29,9 @@ type AppModel struct {
 	sshShell  sshShellModel
 	scanner   scannerModel
 	petStatus petStatusModel
+	export    exportModel
 
+	session   *tools.ScanSession
 	statusMsg string // transient notification (e.g. "Saved!")
 	statusTTL float64
 }
@@ -44,11 +47,10 @@ func New() (AppModel, error) {
 	}
 
 	m := AppModel{
-		p:    p,
-		page: PageOverworld,
+		p:       p,
+		page:    PageOverworld,
+		session: tools.NewScanSession(),
 	}
-	// All sub-models are initialised lazily when navigated to, except the
-	// first scene which must be ready immediately.
 	m.overworld = newOverworldModel(p, 80, 24)
 	return m, nil
 }
@@ -105,6 +107,18 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.statusTTL = 3
 		return m, nil
+
+	case pingResultMsg:
+		m.session.AddPingResult(msg.result)
+
+	case scanResultMsg:
+		m.session.AddScanResult(msg.result)
+
+	case sshConnectedMsg:
+		if m.page == PageSSHShell {
+			params := m.sshShell.params
+			m.session.AddSSHResult(params)
+		}
 	}
 
 	// Delegate to the active scene
@@ -140,6 +154,9 @@ func (m AppModel) handleNavigate(msg navigateMsg) (AppModel, tea.Cmd) {
 		return m, m.scanner.init()
 	case PagePetStatus:
 		m.petStatus = newPetStatusModel(m.p, m.width, m.height)
+	case PageExport:
+		m.export = newExportModel(m.session, m.width, m.height)
+		return m, m.export.init()
 	}
 	return m, nil
 }
@@ -172,6 +189,8 @@ func (m AppModel) delegateUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.scanner, cmd = m.scanner.update(msg)
 	case PagePetStatus:
 		m.petStatus, cmd = m.petStatus.update(msg)
+	case PageExport:
+		m.export, cmd = m.export.update(msg)
 	}
 	return m, cmd
 }
@@ -195,6 +214,8 @@ func (m AppModel) View() string {
 		scene = m.scanner.view()
 	case PagePetStatus:
 		scene = m.petStatus.view()
+	case PageExport:
+		scene = m.export.view()
 	default:
 		scene = styles.Dim.Render("(unknown page)")
 	}

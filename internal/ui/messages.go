@@ -18,6 +18,7 @@ const (
 	PageSSHShell
 	PageScanner
 	PagePetStatus
+	PageExport
 )
 
 // ── Navigation messages ───────────────────────────────────────────────────

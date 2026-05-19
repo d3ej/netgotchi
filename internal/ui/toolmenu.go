@@ -1,10 +1,10 @@
 package ui
 
 import (
-	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/d3ej/netgotchi/internal/styles"
 )
 
@@ -16,6 +16,15 @@ type toolMenuModel struct {
 }
 
 var toolMenuItems = []string{"PING", "SSH", "NMAP", "BACK"}
+
+var toolIcons = map[string]string{
+	"PING": "◎",
+	"SSH":  "⌨",
+	"NMAP": "⊕",
+	"BACK": "←",
+}
+
+const toolBoxWidth = 26
 
 func newToolMenuModel(w, h int) toolMenuModel {
 	return toolMenuModel{items: toolMenuItems, width: w, height: h}
@@ -57,34 +66,34 @@ func (m toolMenuModel) selectItem() tea.Cmd {
 }
 
 func (m toolMenuModel) view() string {
+	innerW := toolBoxWidth - 4
+
 	var sb strings.Builder
 
-	sb.WriteString(styles.Green.Bold(true).Render("[ TOOLS ]"))
+	header := styles.ToolHeader.Width(innerW).Align(lipgloss.Center).Render("NETWORK TOOLS")
+	sb.WriteString(header)
 	sb.WriteByte('\n')
-	sb.WriteString(styles.Dim.Render(strings.Repeat("─", 22)))
+	sb.WriteString(styles.Separator(innerW))
 	sb.WriteByte('\n')
-
-	icons := map[string]string{
-		"PING": "◎",
-		"SSH":  "⌨",
-		"NMAP": "⊕",
-		"BACK": "←",
-	}
+	sb.WriteByte('\n')
 
 	for i, item := range m.items {
-		icon := icons[item]
+		icon := toolIcons[item]
+		label := icon + "  " + item
 		var line string
 		if i == m.cursor {
-			line = styles.Selected.Render(fmt.Sprintf("  ▸ %s %-8s", icon, item))
+			line = styles.Selected.Width(innerW).Render("  " + label)
 		} else {
-			line = styles.Normal.Render(fmt.Sprintf("    %s %-8s", icon, item))
+			line = styles.Normal.Width(innerW).Render("    " + label)
 		}
 		sb.WriteString(line)
 		sb.WriteByte('\n')
 	}
 
 	sb.WriteByte('\n')
+	sb.WriteString(styles.DashedSep(innerW))
+	sb.WriteByte('\n')
 	sb.WriteString(styles.Hint.Render("↑↓ nav  ↵ select  esc back"))
 
-	return styles.AppBox.Width(26).Render(sb.String())
+	return styles.AppBox.Width(toolBoxWidth).Render(sb.String())
 }
