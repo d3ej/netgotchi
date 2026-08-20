@@ -64,8 +64,10 @@ func statTickCmd() tea.Cmd {
 	return tea.Tick(5*time.Second, func(time.Time) tea.Msg { return statTickMsg{} })
 }
 
+const animTickInterval = 600 * time.Millisecond
+
 func animTickCmd() tea.Cmd {
-	return tea.Tick(600*time.Millisecond, func(time.Time) tea.Msg { return animTickMsg{} })
+	return tea.Tick(animTickInterval, func(time.Time) tea.Msg { return animTickMsg{} })
 }
 
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -87,6 +89,12 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, statTickCmd()
 
 	case animTickMsg:
+		if m.statusMsg != "" {
+			m.statusTTL -= animTickInterval.Seconds()
+			if m.statusTTL <= 0 {
+				m.statusMsg = ""
+			}
+		}
 		var owCmd tea.Cmd
 		m.overworld, owCmd = m.overworld.update(msg)
 		return m, tea.Batch(owCmd, animTickCmd())
