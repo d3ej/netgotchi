@@ -15,7 +15,7 @@ type mainMenuModel struct {
 	height int
 }
 
-var mainMenuItems = []string{"TOOLS", "PET", "STATUS", "SAVE", "QUIT"}
+var mainMenuItems = []string{"TOOLS", "STATUS", "SAVE", "QUIT"}
 
 func newMainMenuModel(w, h int) mainMenuModel {
 	return mainMenuModel{items: mainMenuItems, width: w, height: h}
@@ -46,8 +46,6 @@ func (m mainMenuModel) selectItem() tea.Cmd {
 	switch m.items[m.cursor] {
 	case "TOOLS":
 		return cmdNavigate(PageToolMenu)
-	case "PET":
-		return cmdNavigate(PagePetStatus)
 	case "STATUS":
 		return cmdNavigate(PagePetStatus)
 	case "SAVE":
