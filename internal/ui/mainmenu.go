@@ -52,6 +52,8 @@ func (m mainMenuModel) selectItem() tea.Cmd {
 		return cmdSave()
 	case "QUIT":
 		return tea.Quit
+	case "PET":
+		return cmdNavigate(PagePetActions)
 	}
 	return nil
 }
