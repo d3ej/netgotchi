@@ -8,10 +8,6 @@ caring for a virtual pet that evolves as you use the tools.
 **Tech stack:** Go 1.21+, Bubbletea v1.1, Lip Gloss v0.13, Bubbles v0.20,
 `golang.org/x/crypto` (SSH), system `ping` and `nmap` binaries.
 
-> **Legacy Python version:** The original pygame implementation lives in
-> `main.py` and `netgotchi/` (Python package). The Go TUI is now the primary
-> codebase; the Python files are kept for reference only.
-
 ---
 
 ## Repository Layout
@@ -36,16 +32,14 @@ netgotchi/
 │       ├── messages.go        # All tea.Msg types + Page enum + cmd helpers
 │       ├── app.go             # Root AppModel — navigation stack, ticks, save
 │       ├── overworld.go       # Home screen: pet sprite + stat bars
-│       ├── mainmenu.go        # TOOLS / PET / STATUS / SAVE / QUIT
+│       ├── mainmenu.go        # TOOLS / STATUS / SAVE / QUIT
 │       ├── toolmenu.go        # PING / SSH / NMAP / BACK
 │       ├── ping.go            # Ping scene (target select → async → result)
 │       ├── sshauth.go         # SSH auth scene (host → method → credentials)
 │       ├── sshshell.go        # Interactive SSH shell with viewport
 │       ├── scanner.go         # Nmap scene (target → scan type → result)
 │       └── petstatus.go       # Full-screen pet stats
-├── saves/                     # Runtime save data (gitignored)
-├── main.py                    # Legacy pygame entry point
-└── netgotchi/                 # Legacy Python package
+└── saves/                     # Runtime save data (gitignored)
 ```
 
 ---
@@ -56,16 +50,10 @@ netgotchi/
 # First-time setup
 git submodule update --init --recursive   # populate .claude/agent-skills/
 
-# Go TUI (primary)
 go run .
-
-# Legacy pygame (requires Python + deps)
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python3 main.py
 ```
 
-**Controls (Go TUI):**
+**Controls:**
 
 | Action | Keys |
 |--------|------|
