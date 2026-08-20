@@ -86,8 +86,8 @@ func buildNmapArgs(target string, t ScanType) []string {
 // --- XML parsing ---
 
 type nmapRun struct {
-	XMLName xml.Name    `xml:"nmaprun"`
-	Hosts   []nmapHost  `xml:"host"`
+	XMLName xml.Name   `xml:"nmaprun"`
+	Hosts   []nmapHost `xml:"host"`
 }
 
 type nmapHost struct {

@@ -53,10 +53,10 @@ func RunPing(target string, count int) ToolResult {
 		ToolName: "ping",
 		Success:  success,
 		Data: map[string]any{
-			"rtt_avg":    rttAvg,
+			"rtt_avg":     rttAvg,
 			"packet_loss": loss,
-			"raw_output": raw,
-			"target":     target,
+			"raw_output":  raw,
+			"target":      target,
 		},
 		Duration: duration,
 		XPReward: xp,

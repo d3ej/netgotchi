@@ -59,14 +59,14 @@ func newSSHShellModel(p *pet.Pet, params tools.SSHParams, w, h int) sshShellMode
 	s.Style = lipgloss.NewStyle().Foreground(styles.ColGreen)
 
 	return sshShellModel{
-		p:       p,
-		params:  params,
-		phase:   shellPhaseConnecting,
+		p:        p,
+		params:   params,
+		phase:    shellPhaseConnecting,
 		viewport: vp,
-		input:   ti,
-		spinner: s,
-		width:   w,
-		height:  h,
+		input:    ti,
+		spinner:  s,
+		width:    w,
+		height:   h,
 	}
 }
 
