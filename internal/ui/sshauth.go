@@ -23,15 +23,15 @@ var authMethods = []string{"Password", "Key File", "Agent / Auto"}
 var authMethodKeys = []string{"password", "key", "agent"}
 
 type sshAuthModel struct {
-	hosts       []tools.Host
-	hostCursor  int
+	hosts        []tools.Host
+	hostCursor   int
 	methodCursor int
-	phase       sshAuthPhase
+	phase        sshAuthPhase
 	selectedHost *tools.Host
-	inputs      []textinput.Model // [username, secret]
-	focusIdx    int
-	width       int
-	height      int
+	inputs       []textinput.Model // [username, secret]
+	focusIdx     int
+	width        int
+	height       int
 }
 
 func newSSHAuthModel(w, h int) sshAuthModel {
@@ -170,10 +170,11 @@ func (m sshAuthModel) submit() tea.Cmd {
 	method := authMethodKeys[m.methodCursor]
 	host := m.selectedHost
 
-	// If custom host, first input is the address
-	if host.Addr == "" && len(m.inputs) > 0 {
-		host.Addr = strings.TrimSpace(m.inputs[0].Value())
+	idx := 0
+	if host.Addr == "" {
+		host.Addr = strings.TrimSpace(m.inputs[idx].Value())
 		host.Name = host.Addr
+		idx++
 	}
 
 	params := tools.SSHParams{
@@ -185,15 +186,14 @@ func (m sshAuthModel) submit() tea.Cmd {
 		params.Port = 22
 	}
 
+	params.Username = strings.TrimSpace(m.inputs[idx].Value())
+	idx++
+
 	switch method {
 	case "password":
-		params.Username = strings.TrimSpace(m.inputs[0].Value())
-		params.Password = m.inputs[1].Value()
+		params.Password = m.inputs[idx].Value()
 	case "key":
-		params.Username = strings.TrimSpace(m.inputs[0].Value())
-		params.KeyPath = strings.TrimSpace(m.inputs[1].Value())
-	case "agent":
-		params.Username = strings.TrimSpace(m.inputs[0].Value())
+		params.KeyPath = strings.TrimSpace(m.inputs[idx].Value())
 	}
 
 	return cmdNavigateSSHShell(params)
@@ -271,6 +271,19 @@ func hostLabels(hosts []tools.Host) []string {
 }
 
 func buildInputs(method string, host *tools.Host) []textinput.Model {
+	var inputs []textinput.Model
+
+	// Custom hosts have no address yet, so ask for one explicitly instead of
+	// reusing another field's text as the target.
+	if host != nil && host.Addr == "" {
+		hostInput := textinput.New()
+		hostInput.Placeholder = "hostname or IP"
+		hostInput.CharLimit = 128
+		hostInput.Width = 30
+		hostInput.Prompt = "  Host     : "
+		inputs = append(inputs, hostInput)
+	}
+
 	defaultUser := ""
 	if host != nil && host.User != "" {
 		defaultUser = host.User
@@ -284,6 +297,7 @@ func buildInputs(method string, host *tools.Host) []textinput.Model {
 	username.CharLimit = 64
 	username.Width = 30
 	username.Prompt = "  Username : "
+	inputs = append(inputs, username)
 
 	switch method {
 	case "password":
@@ -294,7 +308,7 @@ func buildInputs(method string, host *tools.Host) []textinput.Model {
 		pw.CharLimit = 128
 		pw.Width = 30
 		pw.Prompt = "  Password : "
-		return []textinput.Model{username, pw}
+		inputs = append(inputs, pw)
 
 	case "key":
 		home, _ := os.UserHomeDir()
@@ -304,9 +318,8 @@ func buildInputs(method string, host *tools.Host) []textinput.Model {
 		kp.CharLimit = 256
 		kp.Width = 30
 		kp.Prompt = "  Key path : "
-		return []textinput.Model{username, kp}
-
-	default: // agent
-		return []textinput.Model{username}
+		inputs = append(inputs, kp)
 	}
+
+	return inputs
 }
