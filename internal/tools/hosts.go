@@ -2,9 +2,9 @@ package tools
 
 import (
 	"bufio"
-	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -88,36 +88,13 @@ func sshConfigHosts() []Host {
 		case "user":
 			cur.User = val
 		case "port":
-			var p int
-			if _, err := parsePort(val, &p); err == nil {
+			if p, err := strconv.Atoi(val); err == nil {
 				cur.Port = p
 			}
 		}
 	}
 	flush()
 	return hosts
-}
-
-func parsePort(s string, dst *int) (string, error) {
-	var p int
-	_, err := parseScanInt(s, &p)
-	if err != nil {
-		return s, err
-	}
-	*dst = p
-	return s, nil
-}
-
-func parseScanInt(s string, dst *int) (string, error) {
-	n := 0
-	for _, c := range s {
-		if c < '0' || c > '9' {
-			return s, &net.AddrError{Err: "not a number", Addr: s}
-		}
-		n = n*10 + int(c-'0')
-	}
-	*dst = n
-	return s, nil
 }
 
 func etcHostsHosts() []Host {
