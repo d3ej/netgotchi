@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -86,8 +87,13 @@ func (m petStatusModel) view() string {
 	if len(p.ToolAffinity) > 0 {
 		sb.WriteString(styles.Dim.Render("  Tool affinity"))
 		sb.WriteByte('\n')
-		for tool, count := range p.ToolAffinity {
-			sb.WriteString(fmt.Sprintf("    %-8s : %d\n", tool, count))
+		tools := make([]string, 0, len(p.ToolAffinity))
+		for tool := range p.ToolAffinity {
+			tools = append(tools, tool)
+		}
+		sort.Strings(tools)
+		for _, tool := range tools {
+			sb.WriteString(fmt.Sprintf("    %-8s : %d\n", tool, p.ToolAffinity[tool]))
 		}
 		sb.WriteByte('\n')
 	}
