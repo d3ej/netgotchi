@@ -297,6 +297,21 @@ git commit -m "Update network agent-skills submodule"
   implement a proper known-hosts callback
 - **Adult / Elder sprites** — ASCII art for stages 3 & 4 exists but is minimal;
   feel free to improve `internal/pet/sprites.go`
-- **RPG mechanics** — stat-based tool gating, pet items, etc. are not yet implemented
 - **Test suite** — `tests/` is empty; new tests should use the standard `testing`
   package with `go test ./...`
+
+### Design decision: pwnagotchi-style hybrid, not a gated game
+
+Netgotchi is deliberately **a real network tool with a tamagotchi-style care
+layer, not a game that gates tool access on pet stats.** Concretely:
+
+- Pet stats (mood/hunger/energy) decay in real time, including while the app
+  is closed (`AppModel.New()` applies offline decay from `LastUpdate`) —
+  neglect has a visible, felt consequence.
+- There is **no failure state** and **no stat-based tool gating** — ping/SSH/
+  nmap always work at full functionality regardless of pet condition. Do not
+  add mechanics that block or degrade tool behavior based on pet stats; that
+  was considered and explicitly rejected.
+- Feed/Rest are meant to be actions the player takes on purpose (not only a
+  side effect of running tools), since deliberate care is part of the
+  intended loop.
